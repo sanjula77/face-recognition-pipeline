@@ -1,0 +1,14 @@
+torch>=2.0
+torchvision
+torchaudio
+opencv-python
+numpy
+pandas
+scikit-learn
+albumentations
+mlflow
+dvc
+python-dotenv
+fastapi
+uvicorn
+matplotlib
