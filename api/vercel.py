@@ -34,5 +34,6 @@ async def recognize_face(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
+# Vercel serverless function handler
 def handler(request):
     return app
