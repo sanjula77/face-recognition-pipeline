@@ -105,20 +105,27 @@ def load_models():
         
     except Exception as e:
         st.error(f"❌ Error loading models: {e}")
+        import traceback
+        st.error(f"Full error: {traceback.format_exc()}")
         return None, None, []
 
 def recognize_face(image, model, app_face, class_names):
     """Recognize face in the given image"""
     try:
+        # Debug info
+        st.write(f"🔍 Debug: Processing image of size {image.size if hasattr(image, 'size') else 'unknown'}")
+        
         # Convert PIL to OpenCV format
         if isinstance(image, Image.Image):
             image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
         
         # Convert BGR to RGB for InsightFace
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        st.write(f"🔍 Debug: Image converted, shape: {img_rgb.shape}")
         
         # Detect faces
         faces = app_face.get(img_rgb)
+        st.write(f"🔍 Debug: Found {len(faces)} faces")
         
         if not faces:
             return None, "No face detected"
@@ -126,12 +133,15 @@ def recognize_face(image, model, app_face, class_names):
         # Process the first face
         face = faces[0]
         embedding = face.embedding
+        st.write(f"🔍 Debug: Face embedding shape: {embedding.shape}")
         
         # Make prediction
         probabilities = model.predict_proba(embedding.reshape(1, -1))[0]
         prediction_idx = np.argmax(probabilities)
         confidence = probabilities[prediction_idx]
         predicted_name = class_names[prediction_idx]
+        
+        st.write(f"🔍 Debug: Prediction: {predicted_name}, Confidence: {confidence:.3f}")
         
         # Get top 3 predictions
         top_predictions = []
@@ -157,6 +167,9 @@ def recognize_face(image, model, app_face, class_names):
         }, None
         
     except Exception as e:
+        st.error(f"❌ Recognition error: {e}")
+        import traceback
+        st.error(f"Full error: {traceback.format_exc()}")
         return None, f"Recognition error: {e}"
 
 def main():
