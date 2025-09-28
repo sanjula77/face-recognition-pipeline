@@ -1,4 +1,4 @@
-# Face Recognition Streamlit App Dependencies
+# Face Recognition Pro App Dependencies
 streamlit>=1.28.0
 opencv-python>=4.8.0
 numpy>=1.24.0
@@ -9,3 +9,4 @@ pillow>=10.0.0
 matplotlib>=3.7.0
 seaborn>=0.12.0
 pandas>=2.0.0
+plotly>=5.15.0
