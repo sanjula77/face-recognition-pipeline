@@ -470,11 +470,12 @@ def main():
     # Cloud compatibility notice
     if not OPENCV_AVAILABLE or not INSIGHTFACE_AVAILABLE:
         st.markdown("""
-        <div class="warning-card">
+        <div class="info-card">
             <h3>☁️ Cloud Compatibility Mode</h3>
-            <p>This app is running in cloud compatibility mode. Some features may be limited.</p>
-            <p><strong>Available:</strong> Image upload, mock recognition, analytics dashboard</p>
-            <p><strong>Limited:</strong> Real face detection, camera input</p>
+            <p><strong>Why this mode?</strong> InsightFace and OpenCV are too large for cloud deployment.</p>
+            <p><strong>What works:</strong> Image upload, mock recognition, analytics dashboard, live camera</p>
+            <p><strong>What's simulated:</strong> Face detection uses mock data for demonstration</p>
+            <p><strong>For real recognition:</strong> Use the local version with <code>python run_pro_app.py</code></p>
         </div>
         """, unsafe_allow_html=True)
     
