@@ -220,161 +220,152 @@ def main():
     tab1, tab2, tab3, tab4 = st.tabs(["📷 Live Camera", "📁 Upload Image", "📊 Analytics", "ℹ️ About"])
     
     with tab1:
-        st.header("📷 Live Face Recognition")
+        st.header("🎥 Live Face Recognition")
+        st.info("💡 **Real-time face detection** - Just look at the camera! No buttons to click.")
         
-        # Mode selection
-        recognition_mode = st.radio(
-            "Choose recognition mode:",
-            ["📸 Take Photo", "🎥 Live Video Stream"],
-            horizontal=True
-        )
+        # Initialize live detection state
+        if 'live_detection' not in st.session_state:
+            st.session_state.live_detection = True  # Auto-start
+        if 'live_results' not in st.session_state:
+            st.session_state.live_results = []
+        if 'last_recognition' not in st.session_state:
+            st.session_state.last_recognition = None
+        if 'recognition_count' not in st.session_state:
+            st.session_state.recognition_count = 0
         
-        if recognition_mode == "📸 Take Photo":
-            # Camera input for photo
-            camera_image = st.camera_input("Take a picture for face recognition")
+        # Control buttons (minimal)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🔄 Restart Detection", type="secondary"):
+                st.session_state.live_detection = True
+                st.session_state.recognition_count = 0
+                st.rerun()
+        
+        with col2:
+            if st.button("🗑️ Clear History"):
+                st.session_state.live_results = []
+                st.session_state.recognition_count = 0
+                st.rerun()
+        
+        # Live detection status
+        if st.session_state.live_detection:
+            st.success("🎥 **Live detection is ACTIVE** - Look at your camera!")
+        else:
+            st.error("⏹️ Live detection is STOPPED")
+        
+        # Results display area
+        results_placeholder = st.empty()
+        
+        # Live camera input (continuous)
+        if st.session_state.live_detection:
+            # Use camera input for live stream
+            live_camera = st.camera_input(
+                "Look at the camera for face recognition", 
+                key="live_camera",
+                help="Position your face clearly in the camera view"
+            )
             
-            if camera_image is not None:
-                # Convert to PIL Image
-                image = Image.open(camera_image)
+            if live_camera is not None:
+                # Process the live frame
+                image = Image.open(live_camera)
                 
-                # Display original image
-                col1, col2 = st.columns(2)
+                # Recognize face
+                result, error = recognize_face(image, st.session_state.model, st.session_state.app_face, st.session_state.class_names)
                 
-                with col1:
-                    st.subheader("📸 Captured Image")
-                    st.image(image, use_column_width=True)
+                # Update recognition count
+                st.session_state.recognition_count += 1
                 
-                with col2:
-                    st.subheader("🔍 Recognition Results")
-                    
-                    # Recognize face
-                    with st.spinner("Recognizing face..."):
-                        result, error = recognize_face(image, st.session_state.model, st.session_state.app_face, st.session_state.class_names)
-                    
-                    if result:
-                        # Display results
+                if result:
+                    # Check if this is a new recognition (avoid spam)
+                    current_prediction = f"{result['prediction']}_{result['confidence']:.2f}"
+                    if st.session_state.last_recognition != current_prediction:
+                        st.session_state.last_recognition = current_prediction
+                        
+                        if result['confidence'] >= confidence_threshold:
+                            # High confidence - recognized
+                            with results_placeholder.container():
+                                st.markdown(f"""
+                                <div class="success-box">
+                                    <h2>✅ RECOGNIZED: {result['prediction']}</h2>
+                                    <p><strong>Confidence:</strong> {result['confidence']:.1%}</p>
+                                    <p><strong>Status:</strong> 🎯 High Confidence Match</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            # Add to live results
+                            st.session_state.live_results.append({
+                                'timestamp': time.time(),
+                                'prediction': result['prediction'],
+                                'confidence': result['confidence'],
+                                'status': 'recognized'
+                            })
+                            
+                            # Add to history
+                            st.session_state.recognition_history.append({
+                                'timestamp': time.time(),
+                                'prediction': result['prediction'],
+                                'confidence': result['confidence'],
+                                'success': True
+                            })
+                        
+                        elif result['confidence'] >= 0.5:
+                            # Medium confidence
+                            with results_placeholder.container():
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <h3>❓ {result['prediction']}</h3>
+                                    <p><strong>Confidence:</strong> {result['confidence']:.1%}</p>
+                                    <p><strong>Status:</strong> ⚠️ Medium Confidence</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        
+                        else:
+                            # Low confidence
+                            with results_placeholder.container():
+                                st.markdown(f"""
+                                <div class="error-box">
+                                    <h3>❌ Unknown Person</h3>
+                                    <p><strong>Best Match:</strong> {result['prediction']} ({result['confidence']:.1%})</p>
+                                    <p><strong>Status:</strong> 🚫 Low Confidence</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                
+                else:
+                    # No face detected
+                    with results_placeholder.container():
                         st.markdown(f"""
-                        <div class="metric-card">
-                            <h3>👤 {result['prediction']}</h3>
-                            <p><strong>Confidence:</strong> {result['confidence']:.2%}</p>
+                        <div class="error-box">
+                            <h3>👁️ No Face Detected</h3>
+                            <p>Please position your face clearly in the camera view.</p>
+                            <p><strong>Tips:</strong> Ensure good lighting and face is centered</p>
                         </div>
                         """, unsafe_allow_html=True)
-                        
-                        # Top predictions
-                        st.subheader("🏆 Top Predictions")
-                        for i, pred in enumerate(result['top_predictions']):
-                            st.write(f"{i+1}. **{pred['name']}** - {pred['confidence']:.2%}")
-                        
-                        # Add to history
-                        st.session_state.recognition_history.append({
-                            'timestamp': time.time(),
-                            'prediction': result['prediction'],
-                            'confidence': result['confidence'],
-                            'success': result['confidence'] >= confidence_threshold
-                        })
-                        
-                    else:
-                        st.error(f"❌ {error}")
         
-        else:  # Live Video Stream
-            st.subheader("🎥 Live Video Stream")
-            st.info("💡 **Real-time face detection** - No need to take photos! Just look at the camera.")
+        # Live statistics
+        if st.session_state.live_results:
+            st.subheader("📊 Live Recognition Stats")
             
-            # Live video placeholder
-            video_placeholder = st.empty()
-            results_placeholder = st.empty()
-            
-            # Control buttons
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                start_live = st.button("▶️ Start Live Detection", type="primary")
+                st.metric("Total Scans", st.session_state.recognition_count)
             
             with col2:
-                stop_live = st.button("⏹️ Stop Detection")
+                recognized_count = len([r for r in st.session_state.live_results if r.get('status') == 'recognized'])
+                st.metric("Recognitions", recognized_count)
             
             with col3:
-                if st.button("🗑️ Clear Results"):
-                    if 'live_results' in st.session_state:
-                        del st.session_state.live_results
+                if st.session_state.live_results:
+                    latest = st.session_state.live_results[-1]
+                    st.metric("Latest Confidence", f"{latest['confidence']:.1%}")
             
-            # Live detection state
-            if 'live_detection' not in st.session_state:
-                st.session_state.live_detection = False
-            if 'live_results' not in st.session_state:
-                st.session_state.live_results = []
-            
-            if start_live:
-                st.session_state.live_detection = True
-                st.success("🎥 Live detection started! Look at your camera.")
-            
-            if stop_live:
-                st.session_state.live_detection = False
-                st.info("⏹️ Live detection stopped.")
-            
-            # Live detection display
-            if st.session_state.live_detection:
-                # Use camera input for live stream (Streamlit limitation)
-                live_camera = st.camera_input("Live Face Detection", key="live_camera")
-                
-                if live_camera is not None:
-                    # Process the live frame
-                    image = Image.open(live_camera)
-                    
-                    # Recognize face
-                    result, error = recognize_face(image, st.session_state.model, st.session_state.app_face, st.session_state.class_names)
-                    
-                    if result and result['confidence'] >= confidence_threshold:
-                        # Display live results
-                        with results_placeholder.container():
-                            st.markdown(f"""
-                            <div class="success-box">
-                                <h3>👤 {result['prediction']}</h3>
-                                <p><strong>Confidence:</strong> {result['confidence']:.2%}</p>
-                                <p><strong>Status:</strong> ✅ Recognized</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        
-                        # Add to live results
-                        st.session_state.live_results.append({
-                            'timestamp': time.time(),
-                            'prediction': result['prediction'],
-                            'confidence': result['confidence']
-                        })
-                        
-                        # Add to history
-                        st.session_state.recognition_history.append({
-                            'timestamp': time.time(),
-                            'prediction': result['prediction'],
-                            'confidence': result['confidence'],
-                            'success': True
-                        })
-                    
-                    elif result and result['confidence'] < confidence_threshold:
-                        with results_placeholder.container():
-                            st.markdown(f"""
-                            <div class="error-box">
-                                <h3>❓ {result['prediction']}</h3>
-                                <p><strong>Confidence:</strong> {result['confidence']:.2%}</p>
-                                <p><strong>Status:</strong> ⚠️ Low Confidence</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                    
-                    else:
-                        with results_placeholder.container():
-                            st.markdown(f"""
-                            <div class="error-box">
-                                <h3>❌ No Face Detected</h3>
-                                <p>Please position your face clearly in the camera view.</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-            
-            # Show recent live results
-            if st.session_state.live_results:
-                st.subheader("📋 Recent Live Recognitions")
-                recent_live = st.session_state.live_results[-5:]  # Last 5 results
-                for i, result in enumerate(reversed(recent_live)):
-                    st.write(f"{i+1}. **{result['prediction']}** - {result['confidence']:.2%} ({time.strftime('%H:%M:%S', time.localtime(result['timestamp']))})")
+            # Recent recognitions
+            st.subheader("📋 Recent Recognitions")
+            recent_live = st.session_state.live_results[-10:]  # Last 10 results
+            for i, result in enumerate(reversed(recent_live)):
+                status_icon = "✅" if result.get('status') == 'recognized' else "❓"
+                st.write(f"{status_icon} **{result['prediction']}** - {result['confidence']:.1%} ({time.strftime('%H:%M:%S', time.localtime(result['timestamp']))})")
     
     with tab2:
         st.header("📁 Upload Image for Recognition")
