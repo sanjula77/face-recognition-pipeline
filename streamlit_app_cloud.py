@@ -250,9 +250,14 @@ def create_mock_models():
     """Create mock models for cloud deployment"""
     class MockModel:
         def predict_proba(self, X):
-            # Return random probabilities for demo
+            # Return random probabilities for demo - ensure proper shape
             np.random.seed(42)
-            return np.random.dirichlet(np.ones(7))
+            # X should be 2D array, return probabilities for 7 classes
+            if X.ndim == 1:
+                X = X.reshape(1, -1)
+            batch_size = X.shape[0]
+            # Return 2D array with shape (batch_size, num_classes)
+            return np.random.dirichlet(np.ones(7), size=batch_size)
     
     class MockFaceAnalysis:
         def get(self, img):
@@ -311,7 +316,10 @@ def recognize_face(image, model, app_face, class_names, debug=False):
             st.write(f"🔍 Debug: Face embedding shape: {embedding.shape}")
         
         # Make prediction
-        probabilities = model.predict_proba(embedding.reshape(1, -1))[0]
+        probabilities = model.predict_proba(embedding.reshape(1, -1))
+        # Handle both 1D and 2D probability arrays
+        if probabilities.ndim == 2:
+            probabilities = probabilities[0]  # Take first row if 2D
         prediction_idx = np.argmax(probabilities)
         confidence = probabilities[prediction_idx]
         predicted_name = class_names[prediction_idx]
@@ -543,7 +551,8 @@ def main():
         return
     
     # Tabs
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "🎥 Live Detection", 
         "📁 Upload Image", 
         "📊 Analytics", 
         "🤖 Model Metrics", 
@@ -551,6 +560,113 @@ def main():
     ])
     
     with tab1:
+        st.markdown('<h2 class="sub-header">🎥 Live Face Detection</h2>', unsafe_allow_html=True)
+        
+        # Cloud compatibility notice
+        st.markdown("""
+        <div class="info-card">
+            <h3>☁️ Cloud Live Detection</h3>
+            <p>In cloud mode, we use camera input for demonstration. Real face detection is simulated.</p>
+            <p><strong>Features:</strong> Camera input, mock recognition, real-time results</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Live camera input
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown("### 📹 Camera Feed")
+            live_camera = st.camera_input(
+                "🎥 Live Face Detection - Look at camera", 
+                key="live_camera",
+                help="Position your face clearly in the camera view for automatic recognition"
+            )
+        
+        with col2:
+            st.markdown("### 🎯 Detection Status")
+            if live_camera is not None:
+                st.markdown("""
+                <div class="success-card">
+                    <h4>✅ Camera Active</h4>
+                    <p>👁️ Looking for faces...</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Process the live frame
+                image = Image.open(live_camera)
+                result, error, processing_time = recognize_face(
+                    image, st.session_state.model, st.session_state.app_face, 
+                    st.session_state.class_names, st.session_state.settings['debug_mode']
+                )
+                
+                # Update metrics
+                st.session_state.total_recognitions += 1
+                st.session_state.processing_time = processing_time
+                
+                if result:
+                    # Check if this is a new recognition
+                    current_prediction = f"{result['prediction']}_{result['confidence']:.2f}"
+                    if st.session_state.last_recognition != current_prediction:
+                        st.session_state.last_recognition = current_prediction
+                        
+                        if result['confidence'] >= st.session_state.settings['confidence_threshold']:
+                            # High confidence - recognized
+                            st.markdown(f"""
+                            <div class="success-card">
+                                <h3>✅ RECOGNIZED</h3>
+                                <h2>{result['prediction']}</h2>
+                                <p><strong>Confidence:</strong> {result['confidence']:.1%}</p>
+                                <p><strong>Processing Time:</strong> {result['processing_time']:.3f}s</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            st.session_state.successful_recognitions += 1
+                            
+                            # Add to history
+                            st.session_state.recognition_history.append({
+                                'timestamp': result['timestamp'],
+                                'prediction': result['prediction'],
+                                'confidence': result['confidence'],
+                                'success': True,
+                                'processing_time': result['processing_time']
+                            })
+                        
+                        elif result['confidence'] >= 0.5:
+                            # Medium confidence
+                            st.markdown(f"""
+                            <div class="warning-card">
+                                <h3>❓ {result['prediction']}</h3>
+                                <p><strong>Confidence:</strong> {result['confidence']:.1%}</p>
+                                <p><strong>Status:</strong> ⚠️ Medium Confidence</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        else:
+                            # Low confidence
+                            st.markdown(f"""
+                            <div class="error-card">
+                                <h3>❌ Unknown Person</h3>
+                                <p><strong>Best Match:</strong> {result['prediction']} ({result['confidence']:.1%})</p>
+                                <p><strong>Status:</strong> 🚫 Low Confidence</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                
+                else:
+                    st.markdown(f"""
+                    <div class="error-card">
+                        <h3>👁️ No Face Detected</h3>
+                        <p>Please position your face clearly in the camera view.</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div class="warning-card">
+                    <h4>⚠️ Camera not active</h4>
+                    <p>📷 Click camera to start</p>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    with tab2:
         st.markdown('<h2 class="sub-header">📁 Upload Image for Recognition</h2>', unsafe_allow_html=True)
         
         uploaded_file = st.file_uploader("Choose an image file", type=['jpg', 'jpeg', 'png'])
@@ -623,7 +739,7 @@ def main():
                 use_container_width=True
             )
     
-    with tab3:
+    with tab4:
         create_model_metrics_section()
         
         # Model comparison
@@ -653,7 +769,7 @@ def main():
                                 title='Training Classes')
                     st.plotly_chart(fig, use_container_width=True)
     
-    with tab4:
+    with tab5:
         st.markdown('<h2 class="sub-header">⚙️ System Settings</h2>', unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
