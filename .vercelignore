@@ -1,4 +1,4 @@
-# Exclude large files but keep api directory
+# Exclude large files but keep essential files
 production_models/
 corrected_comparison_results/
 models/
@@ -8,7 +8,6 @@ mlruns_backup/
 src/
 *.md
 !README.md
-!api/
 deploy_google_cloud.py
 start_codespace.py
 start_local_server.py
