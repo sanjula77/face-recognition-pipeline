@@ -1,18 +1,50 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Envs
+# MLflow
+mlruns/
+mlruns_backup/
+
+# Data files (generated and raw, don't commit)
+data/processed/
+data/raw/
+data/test/
+data/embeddings/*.npy
+data/embeddings/*.json
+data/embeddings/embeddings_database.npz
+
+# Models (keep only essential ones)
+models/
+# production_models/  # Keep this for deployment
+# corrected_comparison_results/embeddings_mode_models/  # Keep this for deployment
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
 .env
-.venv/
-*.egg-info
+.env.local
+.env.production
 
-# Data
-/data/
-!data/.gitkeep
-
-# DVC cache
-.dvc/
-
-# Jupyter
-.ipynb_checkpoints/
+# Temporary files
+*.tmp
+*.temp
