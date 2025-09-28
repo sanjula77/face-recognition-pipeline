@@ -1,18 +1,22 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/lightweight.py": {
+      "maxDuration": 10
     }
-  ],
+  },
   "routes": [
     {
+      "src": "/health",
+      "dest": "/api/lightweight.py"
+    },
+    {
+      "src": "/recognize",
+      "dest": "/api/lightweight.py"
+    },
+    {
       "src": "/(.*)",
-      "dest": "api.py"
+      "dest": "/api/lightweight.py"
     }
-  ],
-  "env": {
-    "PYTHON_VERSION": "3.9"
-  }
+  ]
 }
