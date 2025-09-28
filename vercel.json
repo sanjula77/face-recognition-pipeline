@@ -1,7 +1,7 @@
 {
   "version": 2,
   "functions": {
-    "api/vercel.py": {
+    "index.py": {
       "maxDuration": 10
     }
   }
