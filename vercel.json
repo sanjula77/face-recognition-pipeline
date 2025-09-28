@@ -1,22 +1,28 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "requirements-vercel.txt",
+      "use": "@vercel/python"
+    }
+  ],
   "functions": {
-    "api/lightweight.py": {
+    "api/vercel.py": {
       "maxDuration": 10
     }
   },
   "routes": [
     {
       "src": "/health",
-      "dest": "/api/lightweight.py"
+      "dest": "/api/vercel.py"
     },
     {
       "src": "/recognize",
-      "dest": "/api/lightweight.py"
+      "dest": "/api/vercel.py"
     },
     {
       "src": "/(.*)",
-      "dest": "/api/lightweight.py"
+      "dest": "/api/vercel.py"
     }
   ]
 }
