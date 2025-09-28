@@ -22,3 +22,5 @@ Procfile
 render.yaml
 runtime.txt
 .env.example
+index.py
+api/
