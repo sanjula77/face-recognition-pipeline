@@ -260,11 +260,27 @@ def main():
         # Live camera input (continuous)
         if st.session_state.live_detection:
             # Use camera input for live stream
-            live_camera = st.camera_input(
-                "Look at the camera for face recognition", 
-                key="live_camera",
-                help="Position your face clearly in the camera view"
-            )
+            st.markdown("### 📹 Camera Feed")
+            st.markdown("**Instructions:** Look directly at the camera. Face detection will happen automatically when you appear in the frame.")
+            
+            # Create a custom camera interface
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                live_camera = st.camera_input(
+                    "🎥 Live Face Detection", 
+                    key="live_camera",
+                    help="Position your face clearly in the camera view for automatic recognition"
+                )
+            
+            with col2:
+                st.markdown("### 🎯 Detection Status")
+                if live_camera is not None:
+                    st.success("✅ Camera Active")
+                    st.info("👁️ Looking for faces...")
+                else:
+                    st.warning("⚠️ Camera not active")
+                    st.info("📷 Click camera to start")
             
             if live_camera is not None:
                 # Process the live frame
