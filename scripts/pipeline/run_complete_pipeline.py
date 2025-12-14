@@ -7,6 +7,11 @@ Perfect for scaling up your dataset!
 
 import os
 import sys
+
+# Fix OpenMP library conflict on Windows
+# This is needed when multiple libraries (NumPy, SciPy, InsightFace) use OpenMP
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
 import subprocess
 import shutil
 from pathlib import Path
@@ -25,12 +30,33 @@ def run_command(command, description):
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
         # Run without capturing output to avoid Unicode decode errors
-        result = subprocess.run(command, shell=True, check=True, env=env)
-        print(f"   ✅ {description} completed successfully")
-        return True
-    except subprocess.CalledProcessError as e:
+        # Use Popen to see output in real-time with UTF-8 encoding
+        process = subprocess.Popen(
+            command, 
+            shell=True, 
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            encoding='utf-8',
+            errors='replace',
+            bufsize=1
+        )
+        
+        # Print output in real-time
+        for line in process.stdout:
+            print(line.rstrip())
+        
+        process.wait()
+        
+        if process.returncode == 0:
+            print(f"   ✅ {description} completed successfully")
+            return True
+        else:
+            print(f"   ❌ {description} failed with exit code {process.returncode}")
+            return False
+    except Exception as e:
         print(f"   ❌ {description} failed:")
-        print(f"      Error: Command failed with exit code {e.returncode}")
+        print(f"      Error: {e}")
         return False
 
 def validate_dataset():
@@ -69,8 +95,8 @@ def clean_previous_results():
     dirs_to_clean = [
         'data/processed',
         'data/embeddings', 
-        'corrected_comparison_results',
-        'production_models'
+        'models/trained',
+        'models/production'
     ]
     
     for dir_path in dirs_to_clean:
@@ -162,7 +188,7 @@ print("Embeddings mode training completed successfully")
         return False
     
     # Verify training results
-    models_dir = Path('corrected_comparison_results/embeddings_mode_models')
+    models_dir = Path('models/trained/embeddings_mode_models')
     if models_dir.exists():
         model_files = list(models_dir.glob('*.joblib'))
         print(f"   ✅ Trained {len(model_files)} models:")
@@ -187,7 +213,7 @@ import insightface
 from insightface.app import FaceAnalysis
 
 # Load the best model (logistic regression)
-model_path = Path('corrected_comparison_results/embeddings_mode_models/logisticregression.joblib')
+model_path = Path('models/trained/embeddings_mode_models/logisticregression.joblib')
 if not model_path.exists():
     print("❌ Model not found")
     exit(1)
@@ -279,11 +305,11 @@ def create_production_models():
     print_step(7, "PRODUCTION MODEL ORGANIZATION")
     
     # Create production directory
-    production_dir = Path('production_models')
+    production_dir = Path('models/production')
     production_dir.mkdir(exist_ok=True)
     
     # Copy best model
-    best_model = Path('corrected_comparison_results/embeddings_mode_models/logisticregression.joblib')
+    best_model = Path('models/trained/embeddings_mode_models/logisticregression.joblib')
     if best_model.exists():
         production_model = production_dir / 'face_recognizer.joblib'
         shutil.copy2(best_model, production_model)
@@ -305,7 +331,7 @@ from insightface.app import FaceAnalysis
 def recognize_face(image_path):
     """Recognize face in image"""
     # Load model
-    model = joblib.load('production_models/face_recognizer.joblib')
+    model = joblib.load('models/production/face_recognizer.joblib')
     
     # Initialize detector
     app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
@@ -410,8 +436,8 @@ def main():
     print(f"⏱️ Total time: {duration:.1f} seconds")
     print()
     print("📁 OUTPUTS:")
-    print("   - Trained models: corrected_comparison_results/embeddings_mode_models/")
-    print("   - Production model: production_models/face_recognizer.joblib")
+    print("   - Trained models: models/trained/embeddings_mode_models/")
+    print("   - Production model: models/production/face_recognizer.joblib")
     print("   - Inference script: face_recognizer.py")
     print()
     print("🚀 READY FOR PRODUCTION!")

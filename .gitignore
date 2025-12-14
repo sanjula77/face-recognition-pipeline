@@ -4,47 +4,210 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
-
-# MLflow
-mlruns/
-mlruns_backup/
-
-# Data files (generated and raw, don't commit)
-data/processed/
-data/raw/
-data/test/
-data/embeddings/*.npy
-data/embeddings/*.json
-data/embeddings/embeddings_database.npz
-
-# Models (keep only essential ones)
-models/
-# production_models/  # Keep this for deployment
-# corrected_comparison_results/embeddings_mode_models/  # Keep this for deployment
+.venv/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# PyCharm
+.idea/
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
 # Logs
 *.log
+*.log.*
+logs/
 
 # Environment variables
 .env
 .env.local
 .env.production
+.env.development
 
 # Temporary files
 *.tmp
 *.temp
+*.bak
+*.swp
+*~
+temp_training.py
+temp_unenhanced_training.py
+temp_*.py
+
+# MLflow
+mlruns/
+mlruns_backup/
+mlflow.db
+
+# Data files (generated data - keep structure but not actual data)
+data/raw/**/*.jpg
+data/raw/**/*.jpeg
+data/raw/**/*.png
+data/raw/**/*.JPG
+data/raw/**/*.JPEG
+data/raw/**/*.PNG
+data/processed/**/*.png
+data/processed/**/*.npy
+data/processed/**/*.json
+data/embeddings/**/*.npy
+data/embeddings/**/*.json
+data/embeddings/**/*.npz
+data/test/**/*.jpg
+data/test/**/*.jpeg
+data/test/**/*.png
+data/reference_images/**/*.jpg
+data/reference_images/**/*.jpeg
+data/reference_images/**/*.png
+
+# Keep data directory structure
+!data/
+!data/**/
+!data/raw/
+!data/processed/
+!data/embeddings/
+!data/test/
+!data/reference_images/
+
+# Models (trained models - too large for git)
+models/**/*.joblib
+models/**/*.pkl
+models/**/*.h5
+models/**/*.onnx
+models/**/*.pb
+models/trained/**/*
+models/production/**/*.joblib
+
+# Keep models directory structure
+!models/
+!models/trained/
+!models/production/
+
+# Databases
+databases/**/*.db
+databases/**/*.sqlite
+databases/**/*.sqlite3
+databases/reference_database/**/*.npy
+databases/reference_database/**/*.json
+
+# Keep databases directory structure
+!databases/
+!databases/reference_database/
+
+# Outputs (generated reports and visualizations)
+outputs/**/*.txt
+outputs/**/*.png
+outputs/**/*.jpg
+outputs/**/*.pdf
+outputs/**/*.csv
+outputs/reports/**
+outputs/visualizations/**
+
+# Keep outputs directory structure
+!outputs/
+!outputs/reports/
+!outputs/visualizations/
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# InsightFace model cache (downloaded automatically)
+.insightface/
+
+# ONNX Runtime cache
+.onnx/
+
+# Optuna study databases
+*.db
+optuna.db
+
+# Project specific
+*.meta.json
+embeddings_database.npz
+classification_report.txt
+confusion_matrix.png
+
+# Keep essential documentation
+!README.md
+!requirements.txt
+!docs/
+!docs/**/*.md

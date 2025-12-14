@@ -29,16 +29,24 @@ from src.training.train_classifier import (
     ArcFaceWrapper
 )
 from src.training.advanced_optuna import AdvancedOptunaTuner
+from src.embeddings.normalization import EmbeddingNormalizer, get_best_normalization_method
+from src.training.model_ensemble import ModelEnsemble
+from src.training.confidence_calibration import ConfidenceCalibrator
 
 class CorrectedComparison:
     """
     CORRECTED comparison system with proper train/test splits to avoid data leakage.
     """
     
-    def __init__(self, results_dir="corrected_comparison_results", n_trials=20):
+    def __init__(self, results_dir="models/trained", n_trials=20,
+                 use_ensemble=True, use_calibration=True, use_enhanced_normalization=True):
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(exist_ok=True)
         self.n_trials = n_trials
+        self.use_ensemble = use_ensemble
+        self.use_calibration = use_calibration
+        self.use_enhanced_normalization = use_enhanced_normalization
+        self.normalizer = None
         
         # Create separate model directories
         self.embeddings_models_dir = self.results_dir / "embeddings_mode_models"
@@ -77,8 +85,50 @@ class CorrectedComparison:
         print(f"Classes: {le.classes_}")
         print(f"Class distribution: {np.bincount(y_numeric)}")
         
+        # Validate that we have at least 2 classes
+        n_classes = len(le.classes_)
+        if n_classes < 2:
+            error_msg = (
+                f"\n❌ ERROR: Cannot train classifier with only {n_classes} class(es)!\n"
+                f"   Found classes: {list(le.classes_)}\n"
+                f"   Total embeddings: {len(y)}\n\n"
+                f"   Possible causes:\n"
+                f"   1. Only one person's images were processed in preprocessing\n"
+                f"   2. Face detection failed for other people's images\n"
+                f"   3. Embedding extraction only found one person's files\n\n"
+                f"   Please check:\n"
+                f"   - data/processed/ directory - should have subdirectories for each person\n"
+                f"   - data/embeddings/ directory - should have embeddings from multiple people\n"
+                f"   - Run preprocessing again to ensure all people are processed\n"
+            )
+            raise ValueError(error_msg)
+        
+        # Normalization - enhanced or simple based on settings
+        if hasattr(self, 'use_enhanced_normalization') and self.use_enhanced_normalization:
+            # Enhanced normalization - find best method
+            print("\n🔧 Finding best normalization method...")
+            X_train_temp, X_test_temp, y_train_temp, y_test_temp = train_test_split(
+                X, y_numeric, test_size=0.2, stratify=y_numeric, random_state=42
+            )
+            best_norm_method = get_best_normalization_method(X_train_temp, y_train_temp)
+            
+            # Apply best normalization
+            normalizer = EmbeddingNormalizer(method=best_norm_method)
+            normalizer.fit(X_train_temp)  # Fit on training data
+            X_norm = normalizer.normalize(X)
+            
+            # Store normalizer for later use and save it
+            self.normalizer = normalizer
+            normalizer_path = self.embeddings_models_dir / 'normalizer.joblib'
+            joblib.dump(normalizer, normalizer_path)
+            print(f"✅ Normalizer saved: {normalizer_path}")
+        else:
+            # Simple L2 normalization (original)
+            print("\n🔧 Using simple L2 normalization...")
+            X_norm = normalize(X, axis=1)
+            self.normalizer = None
+        
         # PROPER train/test split
-        X_norm = normalize(X, axis=1)
         X_train, X_test, y_train, y_test = train_test_split(
             X_norm, y_numeric, test_size=0.2, stratify=y_numeric, random_state=42
         )
@@ -102,6 +152,22 @@ class CorrectedComparison:
         )
         
         self.results["embeddings_mode"] = results
+        
+        # Create model ensemble if enabled
+        if self.use_ensemble and len(results) > 1:
+            print(f"\n🔧 Creating model ensemble...")
+            ensemble = ModelEnsemble(voting_method='soft')
+            ensemble.load_models_from_dir(self.embeddings_models_dir)
+            
+            # Evaluate ensemble
+            ensemble_results = ensemble.evaluate_models(tuner.X_test, tuner.y_test)
+            
+            # Save ensemble
+            ensemble_path = self.embeddings_models_dir / "ensemble.joblib"
+            joblib.dump(ensemble, ensemble_path)
+            print(f"✅ Ensemble saved: {ensemble_path}")
+            
+            self.results["embeddings_mode"]["ensemble"] = ensemble_results
         
         print(f"✅ Embeddings mode completed. Models saved to: {self.embeddings_models_dir}")
         return results
@@ -213,10 +279,30 @@ class CorrectedComparison:
             
             # Train and evaluate final model on PROPER test set
             final_model = tuner._train_final_model(model_name, best_params)
-            test_accuracy = final_model.score(tuner.X_test, tuner.y_test)
+            
+            # Apply confidence calibration if enabled
+            y_pred = None
+            if self.use_calibration:
+                print(f"   🔧 Calibrating {model_name} probabilities...")
+                y_proba_train = final_model.predict_proba(tuner.X_train)
+                calibrator = ConfidenceCalibrator(method='isotonic')
+                calibrator.fit(tuner.y_train, y_proba_train)
+                
+                # Test calibrated predictions
+                y_proba_test = final_model.predict_proba(tuner.X_test)
+                y_proba_calibrated = calibrator.calibrate_proba(y_proba_test)
+                y_pred = np.argmax(y_proba_calibrated, axis=1)
+                test_accuracy = np.mean(y_pred == tuner.y_test)
+                
+                # Save calibrator
+                calibrator_path = models_dir / f"{model_name.lower()}_calibrator.joblib"
+                joblib.dump(calibrator, calibrator_path)
+                print(f"   ✅ Calibrator saved: {calibrator_path}")
+            else:
+                test_accuracy = final_model.score(tuner.X_test, tuner.y_test)
+                y_pred = final_model.predict(tuner.X_test)
             
             # Get detailed classification report
-            y_pred = final_model.predict(tuner.X_test)
             report = classification_report(tuner.y_test, y_pred, target_names=class_names, output_dict=True)
             
             print(f"{model_name} Test accuracy: {test_accuracy:.4f}")
@@ -444,7 +530,7 @@ def main():
     parser.add_argument("--n_trials", type=int, default=20, help="Number of Optuna trials per algorithm")
     parser.add_argument("--n_augment", type=int, default=1, help="Number of augmentations for images mode")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for image processing")
-    parser.add_argument("--results_dir", default="corrected_comparison_results", help="Results directory")
+    parser.add_argument("--results_dir", default="models/trained", help="Results directory")
     
     args = parser.parse_args()
     

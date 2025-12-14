@@ -2,9 +2,13 @@
 import os
 import json
 import numpy as np
+import cv2
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
-import mlflow
+try:
+    import mlflow
+except ImportError:
+    mlflow = None
 
 def save_embedding(embedding: np.ndarray, metadata: Dict, output_path: str):
     """
@@ -107,16 +111,31 @@ def batch_extract_embeddings(processed_dir: str, output_dir: str, model) -> Dict
     
     for face_file in face_files:
         try:
-            # Load normalized face
-            face_tensor = np.load(face_file)
+            # Load normalized face (saved as RGB float32 [0,1] in HWC format)
+            face_img_normalized = np.load(face_file)
             
-            # Extract embedding using ArcFace recognition model directly
-            # Convert face tensor to the format expected by insightface
-            face_img = np.transpose(face_tensor, (1, 2, 0))  # CHW to HWC
-            face_img = ((face_img + 1) * 127.5).astype(np.uint8)  # [-1,1] to [0,255]
+            # Convert from normalized RGB [0,1] to BGR uint8 [0,255]
+            # The normalized face is in RGB format, we need BGR for InsightFace
+            if face_img_normalized.dtype != np.uint8:
+                # Convert from [0,1] to [0,255]
+                face_img_uint8 = (face_img_normalized * 255.0).astype(np.uint8)
+            else:
+                face_img_uint8 = face_img_normalized
             
-            # Use recognition model directly for pre-aligned faces
-            embedding = model.models['recognition'].get_feat(face_img)
+            # Convert RGB to BGR (InsightFace expects BGR)
+            if len(face_img_uint8.shape) == 3:
+                face_img_bgr = cv2.cvtColor(face_img_uint8, cv2.COLOR_RGB2BGR)
+            else:
+                face_img_bgr = face_img_uint8
+            
+            # Ensure correct shape: (112, 112, 3) for ArcFace
+            if face_img_bgr.shape[:2] != (112, 112):
+                face_img_bgr = cv2.resize(face_img_bgr, (112, 112))
+            
+            # Use the recognition model directly for pre-aligned faces
+            # The model expects BGR uint8 image
+            embedding = model.models['recognition'].get_feat(face_img_bgr)
+            
             # Flatten embedding to 1D vector
             embedding = embedding.flatten()
             
